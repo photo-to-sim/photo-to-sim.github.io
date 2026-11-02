@@ -1,0 +1,14 @@
+# Never publish 3D geometry from this folder (the scenes stay in ../project_page_preview/web3d_private/)
+*.glb
+*.gltf
+*.glb.json
+*.usd
+*.usda
+*.usdc
+*.usdz
+*.obj
+*.ply
+*.stl
+*.fbx
+*.blend
+*.npz
