@@ -34,7 +34,7 @@ When the paper is out, turn the "Paper (soon)" entries in the header and nav int
 ## What loads when
 
 - On open (about 4 MB): header loop, pipeline images, first gallery frame.
-- Near the 3D section (within 300 px of the screen): each pack's turntable video streams, 11–14 MB each; in the pipeline, about 0.5 MB per part.
+- Near the 3D section: a first-frame poster per pack (50–70 KB) from 1,500 px away, the turntable video (11–14 MB, streaming) from 900 px; the all-keyframe drag version (`*_scrub.mp4`, about 6 MB) only on hover or drag. Pipeline parts: about 0.5 MB each.
 - On play: the robot video (11 MB). Gallery frames load one at a time as they are clicked.
 
 ## Files

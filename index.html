@@ -726,64 +726,96 @@
     var KNOB = '<div class="split"><div class="knob" role="slider" aria-label="Appearance versus semantic classes" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" tabindex="0">' +
       '<svg viewBox="0 0 24 24"><path d="m9 6-5 6 5 6M15 6l5 6-5 6"/></svg></div></div>';
     var HINT = '<div class="hint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>Drag to turn · slide to compare</div>';
+    function vid(src) {
+      var v = document.createElement('video');
+      v.muted = true; v.loop = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; if (src) v.src = src;
+      return v;
+    }
+    function kick(v) {   // Chrome does not fetch a paused video that is not in the page; a play() starts the download
+      var p = v.play(); if (p && p.catch) p.catch(function () {});
+    }
     function Turn(host, opts) {
       this.host = host; this.pair = !!opts.pair; this.contain = !!opts.contain; this.split = this.pair ? 0.5 : 1; this.speed = opts.speed || SPEED;
-      this.prev = document.createElement('canvas'); this.lastT = -1; this.fadeAt = 0;
-      this.idleAt = -Infinity; this.visible = false; this.started = false; this.dragging = false; this.pending = null;
+      this.idleAt = -Infinity; this.visible = false; this.started = false; this.dragging = false;
+      this.frac = 0; this.target = 0; this.easing = false; this.useScrub = false; this.handing = false;
       host.insertAdjacentHTML('afterbegin', '<canvas></canvas>' + (this.pair ? '<span class="tag l">appearance</span><span class="tag r">semantic classes</span>' + KNOB + HINT : ''));
       this.canvas = host.querySelector('canvas'); this.ctx = this.canvas.getContext('2d');
-      var self = this, v = this.video = document.createElement('video');
-      v.muted = true; v.loop = true; v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto';
-      v.defaultPlaybackRate = this.speed; v.addEventListener('loadedmetadata', function () { v.playbackRate = self.speed; });
-      v.addEventListener('seeked', function () { if (self.pending !== null) { var t = self.pending; self.pending = null; v.currentTime = t; } });
+      this.video = vid(); this.scrub = null; this.poster = null; this.posterOn = false;
+      var self = this;
+      this.video.addEventListener('loadedmetadata', function () { self.video.playbackRate = self.speed; });
+      this.video.addEventListener('seeked', function () { if (self.handing) { self.handing = false; self.useScrub = false; } });
       this.src = host.dataset.video;
       this.bindDrag(); if (this.pair) this.bindSplit();
     }
-    Turn.prototype.start = function () { if (this.started) return; this.started = true; this.video.src = this.src; this.video.load(); };
+    Turn.prototype.preview = function () {   // first-frame image, shown at once while the video is still on its way
+      if (this.posterOn) return; this.posterOn = true;
+      var self = this, im = new Image(); im.onload = function () { if (self.poster === im) self.draw(); };
+      this.poster = im; im.src = this.src.replace(/\.mp4$/, '_poster.jpg');
+    };
+    Turn.prototype.start = function () { if (this.started) return; this.started = true; this.preview(); this.video.src = this.src; this.video.load(); };
     Turn.prototype.setSrc = function (src) {
-      this.src = src; if (!this.started) return;
+      this.src = src; this.useScrub = false; this.handing = false; this.posterOn = false; this.preview();
+      if (this.scrub) { this.scrub.pause(); this.scrub.removeAttribute('src'); this.scrub.load(); this.scrub = null; }
+      if (!this.started) return;
       var v = this.video; v.src = src; v.load();
-      if (this.visible && !REDUCE) { v.playbackRate = this.speed; var p = v.play(); if (p && p.catch) p.catch(function () {}); }   // start fetching right away
+      if (this.visible && !REDUCE) { v.playbackRate = this.speed; kick(v); }
     };
-    Turn.prototype.seek = function (t) {
-      var v = this.video, d = v.duration; if (!d) return;
-      t = ((t % d) + d) % d;
-      if (v.seeking) this.pending = t; else v.currentTime = t;
+    // the drag version: every angle is a keyframe, so any angle shows at once; fetched only when someone hovers or drags
+    Turn.prototype.ensureScrub = function () {
+      if (this.scrub || !this.started) return;
+      var s = this.scrub = vid(this.src.replace(/\.mp4$/, '_scrub.mp4'));
+      s.addEventListener('playing', function () { s.pause(); }, { once: true }); kick(s);
     };
-    Turn.prototype.paint = function (ctx, c) {
-      var v = this.video, vw = v.videoWidth, vh = v.videoHeight, fw = this.pair ? vw / 2 : vw;
+    Turn.prototype.frac0 = function () { var v = this.video; return v.duration ? v.currentTime / v.duration : 0; };
+    Turn.prototype.paint = function (v, ctx, c) {
+      var vw = v.videoWidth || v.naturalWidth, vh = v.videoHeight || v.naturalHeight, fw = this.pair ? vw / 2 : vw;
       if (this.contain) {
         var k = Math.min(c.width / fw, c.height / vh), w = fw * k, h = vh * k;
-        ctx.drawImage(v, 0, 0, fw, vh, (c.width - w) / 2, (c.height - h) / 2, w, h);
+        ctx.fillStyle = '#000'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(v, 0, 0, fw, vh, (c.width - w) / 2, (c.height - h) / 2, w, h);
       } else {
         var x = Math.round(c.width * this.split), sx = fw * x / c.width;
-        if (x > 0) ctx.drawImage(v, 0, 0, sx, vh, 0, 0, x, c.height);                                       // appearance, left of the handle
+        if (x > 0) ctx.drawImage(v, 0, 0, sx, vh, 0, 0, x, c.height);                                         // appearance, left of the handle
         if (this.pair && x < c.width) ctx.drawImage(v, fw + sx, 0, fw - sx, vh, x, 0, c.width - x, c.height);   // classes, right of it
       }
     };
-    Turn.prototype.draw = function (now) {
-      var v = this.video, c = this.canvas; if (v.readyState < 2) return;
+    Turn.prototype.draw = function () {
+      var v = this.useScrub && this.scrub && this.scrub.readyState >= 2 ? this.scrub : this.video, c = this.canvas;
+      if (v.readyState < 2) { if (this.poster && this.poster.complete && this.poster.naturalWidth) v = this.poster; else return; }
       var W = c.clientWidth, H = c.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2); if (!W || !H) return;
-      if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = this.prev.width = Math.round(W * dpr); c.height = this.prev.height = Math.round(H * dpr); this.lastT = -1; }
-      var ctx = this.ctx, playing = !v.paused && !this.dragging;
-      if (v.currentTime !== this.lastT) {   // a new frame: keep the last image to fade from
-        if (playing && this.lastT >= 0) this.prev.getContext('2d').drawImage(c, 0, 0);
-        this.lastT = v.currentTime; this.fadeAt = now;
+      if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+      this.paint(v, this.ctx, c); this.host.classList.add('ready');
+    };
+    // every frame while dragging or settling: ease the shown angle toward the finger and seek the drag video there
+    Turn.prototype.step = function () {
+      if (!this.dragging && !this.easing) return;
+      this.frac += (this.target - this.frac) * 0.3;
+      var settled = Math.abs(this.target - this.frac) < 0.0005;
+      if (settled) this.frac = this.target;
+      var f = ((this.frac % 1) + 1) % 1, s = this.scrub;
+      if (s && s.readyState >= 1 && s.duration) { this.useScrub = true; if (!s.seeking) s.currentTime = Math.min(s.duration - 0.001, f * s.duration); }
+      else if (this.video.duration && !this.video.seeking) this.video.currentTime = f * this.video.duration;   // drag video not there yet
+      if (settled && !this.dragging) {   // hand back to the smooth video at the same angle
+        this.easing = false;
+        if (this.useScrub && this.video.duration) { this.handing = true; this.video.currentTime = f * this.video.duration; }
       }
-      var fade = (1000 / 24) / this.speed, a = playing && this.speed < 1 ? Math.min(1, (now - this.fadeAt) / fade) : 1;   // blend only when slowed down
-      if (this.contain) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, c.width, c.height); }
-      if (a < 1) { ctx.globalAlpha = 1; ctx.drawImage(this.prev, 0, 0); ctx.globalAlpha = a; this.paint(ctx, c); ctx.globalAlpha = 1; }
-      else this.paint(ctx, c);
-      this.host.classList.add('ready');
     };
     Turn.prototype.touch = function () { this.idleAt = performance.now(); this.host.classList.add('touched'); };
     Turn.prototype.bindDrag = function () {
-      var self = this, c = this.canvas, v = this.video, x0 = null, t0 = 0;
-      c.addEventListener('pointerdown', function (e) { x0 = e.clientX; t0 = v.currentTime; self.dragging = true; v.pause(); c.setPointerCapture(e.pointerId); self.touch(); });
-      c.addEventListener('pointermove', function (e) { if (x0 === null) return; self.seek(t0 - (e.clientX - x0) * (v.duration || 0) / (c.clientWidth * 1.4)); self.touch(); });
-      function up() { x0 = null; self.dragging = false; } c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
+      var self = this, c = this.canvas, v = this.video, x0 = null, f0 = 0;
+      c.addEventListener('pointerenter', function () { self.ensureScrub(); });
+      c.addEventListener('pointerdown', function (e) {
+        self.ensureScrub(); v.pause(); x0 = e.clientX;
+        if (!self.easing) self.frac = self.target = self.frac0();
+        f0 = self.target; self.dragging = true; self.easing = true; c.setPointerCapture(e.pointerId); self.touch();
+      });
+      c.addEventListener('pointermove', function (e) { if (x0 === null) return; self.target = f0 - (e.clientX - x0) / (c.clientWidth * 1.4); self.touch(); });
+      function up() { x0 = null; self.dragging = false; self.touch(); } c.addEventListener('pointerup', up); c.addEventListener('pointercancel', up);
       c.tabIndex = 0; c.setAttribute('aria-label', 'Rendered turntable; drag or use the arrow keys to turn');
-      c.addEventListener('keydown', function (e) { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { v.pause(); self.seek(v.currentTime + (e.key === 'ArrowLeft' ? -0.4 : 0.4)); self.touch(); } });
+      c.addEventListener('keydown', function (e) {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        self.ensureScrub(); v.pause(); if (!self.easing) self.frac = self.target = self.frac0();
+        self.target += e.key === 'ArrowLeft' ? -1 / 72 : 1 / 72; self.easing = true; self.touch();
+      });
     };
     Turn.prototype.bindSplit = function () {
       var self = this, el = this.host.querySelector('.split'), knob = el.querySelector('.knob'), drag = false;
@@ -799,20 +831,24 @@
     if (partTurn) { turns.push(partTurn); document.addEventListener('pipepart', function (e) { partTurn.setSrc('assets/spin/part_' + e.detail + '.mp4'); }); }
     function check() {
       var vh = window.innerHeight;
-      // stream a video only when its viewer is nearly on screen
-      turns.forEach(function (t) { var r = t.host.getBoundingClientRect(); t.visible = r.bottom > 0 && r.top < vh; if (r.top < vh + 300 && r.bottom > -300) t.start(); });
+      // a first-frame preview from 1500 px away, the video stream from 900 px
+      turns.forEach(function (t) {
+        var r = t.host.getBoundingClientRect(); t.visible = r.bottom > 0 && r.top < vh;
+        if (r.top < vh + 1500 && r.bottom > -1500) t.preview();
+        if (r.top < vh + 900 && r.bottom > -900) t.start();
+      });
     }
     window.addEventListener('scroll', check, { passive: true }); window.addEventListener('resize', check); check();
     var reset = document.getElementById('reset-view');
-    if (reset) reset.addEventListener('click', function () { turns.forEach(function (t) { t.seek(0); }); });
+    if (reset) reset.addEventListener('click', function () { turns.forEach(function (t) { if (t.video.duration) t.video.currentTime = 0; t.frac = t.target = 0; }); });
     (function loop(now) {
       requestAnimationFrame(loop);
       turns.forEach(function (t) {
-        var v = t.video, auto = !REDUCE && t.visible && !t.dragging && now - t.idleAt > 8000;
-        // play() also makes Chrome fetch the data of a video that is not in the page, so do not wait for readyState first
-        if (auto && v.paused && v.src) { v.playbackRate = t.speed; var p = v.play(); if (p && p.catch) p.catch(function () {}); }
+        var v = t.video; t.step();
+        var auto = !REDUCE && t.visible && !t.dragging && !t.easing && !t.handing && now - t.idleAt > 8000;
+        if (auto && v.paused && v.src) { v.playbackRate = t.speed; kick(v); }
         if (!auto && !v.paused) v.pause();
-        if (t.visible) t.draw(now);
+        if (t.visible) t.draw();
       });
     })(performance.now());
   })();
