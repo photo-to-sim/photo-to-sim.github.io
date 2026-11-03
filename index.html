@@ -752,6 +752,12 @@
       var s = this.scrub = vid(this.src.replace(/\.mp4$/, '_scrub.mp4'), this.host);
       s.addEventListener('playing', function () { s.pause(); }, { once: true }); kick(s);
     };
+    // true when the drag version has a frame within about 3.6 degrees of the angle being shown (it starts at 0 deg: drawing it earlier made the first touch jump)
+    Turn.prototype.scrubInSync = function () {
+      var s = this.scrub; if (!s || s.readyState < 2 || s.seeking || !s.duration) return false;
+      var f = ((this.frac % 1) + 1) % 1, d = Math.abs(s.currentTime / s.duration - f);
+      return Math.min(d, 1 - d) < 0.01;
+    };
     Turn.prototype.frac0 = function () { var v = this.video; return v.duration ? v.currentTime / v.duration : 0; };
     Turn.prototype.paint = function (v, ctx, c) {
       var vw = v.videoWidth || v.naturalWidth, vh = v.videoHeight || v.naturalHeight, fw = this.pair ? vw / 2 : vw;
@@ -765,7 +771,7 @@
       }
     };
     Turn.prototype.draw = function () {
-      var v = this.useScrub && this.scrub && this.scrub.readyState >= 2 ? this.scrub : this.video, c = this.canvas;
+      var v = this.useScrub && this.scrubInSync() ? this.scrub : this.video, c = this.canvas;
       if (v.readyState < 2) { if (this.poster && this.poster.complete && this.poster.naturalWidth) v = this.poster; else return; }
       var W = c.clientWidth, H = c.clientHeight, dpr = Math.min(window.devicePixelRatio || 1, 2); if (!W || !H) return;
       if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
@@ -780,7 +786,8 @@
       var f = ((this.frac % 1) + 1) % 1, s = this.scrub;
       // use the drag version only once it has a decoded frame; until then seek the main video, so the turn is always visible
       if (s && s.readyState >= 2 && s.duration) { this.useScrub = true; if (!s.seeking) s.currentTime = Math.min(s.duration - 0.001, f * s.duration); }
-      else if (this.video.duration && !this.video.seeking) this.video.currentTime = f * this.video.duration;   // drag video not there yet
+      // until the drag version has caught up, keep the main video following the finger
+      if (!this.scrubInSync() && this.video.duration && !this.video.seeking) this.video.currentTime = f * this.video.duration;
       if (settled && !this.dragging) {   // hand back to the smooth video at the same angle
         this.easing = false;
         if (this.useScrub && this.video.duration) {
