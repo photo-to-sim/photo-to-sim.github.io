@@ -403,7 +403,7 @@
   </div>
   <div class="prose">
     <p>Robotic EV-battery disassembly needs a perception model per battery design, and synthetic training needs a simulation scene per design. Production CAD is generally unavailable, so those scenes are <b>hand-built, at about 100 to 138 hours per pack</b>.</p>
-    <p><b>We build the scene from photographs instead.</b> Each rigid component is photographed on a plain background during the teardown, reconstructed from a single image, scaled to metric size with one physical measurement and assembled in NVIDIA Isaac Sim with the teardown photos as the layout reference. No CAD geometry or CAD-derived dimensions are used. Wiring and connectors are not reconstructed and are outside the scope of the comparison. Trained on synthetic renders only, the resulting model segments real images of two production packs with pack- and component-dependent differences to the CAD route, and provides the perception for a physical disassembly cell.</p>
+    <p><b>We build the scene from photographs instead.</b> Each rigid component is photographed on a white background during the teardown, reconstructed from a single image, scaled to metric size with one physical measurement and assembled in NVIDIA Isaac Sim with the teardown photos as the layout reference. No CAD geometry or CAD-derived dimensions are used. Wiring and connectors are not reconstructed and are outside the scope of the comparison. Trained on synthetic renders only, the resulting model segments real images of two production packs with pack- and component-dependent differences to the CAD route, and provides the perception for a physical disassembly cell.</p>
   </div>
 </section>
 
@@ -424,7 +424,7 @@
           <button type="button" data-part="bolt" aria-pressed="false">Bolt</button><button type="button" data-part="ccu" aria-pressed="false">Control unit</button>
         </div></div>
         <div class="pnum">01</div><h3>Photograph and reconstruct</h3>
-        <p>Every rigid component is photographed on a plain background during the teardown and reconstructed from that single image. One physical measurement sets its metric scale.</p>
+        <p>Each component is photographed from several viewpoints on a white background during the teardown. Every reconstruction uses one photo; the candidate that best matches the real part is kept. One physical measurement sets its metric scale; further measurements only check it.</p>
       </article>
       <article class="pstep">
         <div class="pmedia"><img src="assets/pipe/scene.jpg" alt="The assembled photo-to-sim scene of the Audi e-tron pack" loading="lazy"><span class="ptag">Assembled scene</span></div>
@@ -436,7 +436,7 @@
           <img class="on" src="assets/pipe/synth_s2100.jpg" alt="Synthetic training render" loading="lazy"><img src="assets/pipe/synth_s2359.jpg" alt="" loading="lazy"><img src="assets/pipe/synth_s2618.jpg" alt="" loading="lazy">
         </div><span class="ptag">Synthetic render, labels automatic</span></div>
         <div class="pnum">03</div><h3>Render and train</h3>
-        <p>Domain-randomized rendering with the real camera's intrinsics and working distances yields images with pixel-perfect masks. RF-DETR-Seg is trained on these alone.</p>
+        <p>Domain randomization of camera pose, lighting, environment and materials yields images with pixel-perfect masks. RF-DETR-Seg is trained on these alone.</p>
       </article>
       <article class="pstep">
         <div class="pmedia"><div class="fade" id="p-seg">
@@ -584,7 +584,7 @@
           <div class="hbar"><i class="p" style="--w:4%"></i><span>5.5 h photo-to-sim</span></div>
           <div class="hbar"><i class="c" style="--w:100%"></i><span>138 h CAD</span></div></div>
       </div>
-      <p class="note">Estimated from timestamped project records. CAD hours are active modelling time at a 15-minute inactivity threshold and exclude simulator integration and material authoring. The physical teardown is excluded from both routes.</p>
+      <p class="note">Estimated from timestamped project records. CAD hours are active in-CAD interaction time for modelling and assembly (edits less than 15 minutes apart) and exclude simulator integration and initial material authoring. Photo-to-sim hours include photography and scene construction in the simulator but not reconstruction compute (about 13 min e-tron, 26 min Kona of unattended GPU time). The physical teardown is excluded from both routes.</p>
     </div>
   </div>
 </section>
@@ -597,7 +597,7 @@
       <figcaption class="foot cap">Hyundai Kona, same pack position, 5× speed. In this clip the CAD-trained model runs first. Inset: the robot camera with the model's masks and grasp targets at each detection, synchronised from the robot logs.</figcaption>
     </figure>
     <div class="txt">
-      <p>Each predicted instance mask is converted by a <b>class-specific geometric policy</b> into a 4-DoF top-down grasp, back-projected with registered depth and transformed into the robot base frame. Execution is operator-gated; the paper treats this as a proof of concept on one pack.</p>
+      <p>Each predicted instance mask is converted by a <b>class-specific geometric policy</b> into a 4-DoF top-down grasp, back-projected with registered depth and transformed into the robot base frame. Execution is operator-gated.</p>
       <p>The clip shows the full sequence on the real Hyundai Kona pack: the four polystyrene spacers and the four battery modules are picked from one pack and placed into a second one. The same pack position is run <b>with each perception model</b>; in this clip the one trained on the hand-built CAD scene runs first, then the one trained on the photo-to-sim scene. The inset shows what the robot saw: the overview capture, a close-up before each suction pick, and the module overview before the gripper picks.</p>
     </div>
   </div>
@@ -617,7 +617,7 @@
         <tr><td>Detections beyond the parts present</td><td class="num">0</td><td class="num">0</td></tr>
       </tbody>
     </table></div>
-    <p class="note">Each pack position was run once with each model, in alternating order, with the same capture settings and grasp policy; only the perception weights changed. The one miss was a fully visible spacer at position 17 that the photo-trained model left unmasked. Picks that failed for planning or mechanical reasons are not counted against either model.</p>
+    <p class="note">The robot evaluation covers 20 positions of one Hyundai Kona pack, each run once with each model in alternating order, with the same capture settings and grasp policy; only the segmentation weights differ. It scores detection of the four modules and four polystyrene spacers in the overview capture, not pick success: execution is operator-gated, and runs aborted for planning or mechanical reasons were repeated and do not count against either model. The one miss was a fully visible spacer at position 17 that the photo-trained model left unmasked. The paper presents this as a proof of concept.</p>
   </div>
 </section>
 
@@ -661,7 +661,7 @@
     var V = '?v=3';
     var FR = { etron: { parts: ['0188','0191','0261','0314','0339','0352','0356','0403','0407','0422'], bolts: ['0238','0260','0261','0292','0319','0333','0339','0352','0403'], synth: ['s2100','s2248','s2359','s2470','s2618','s2729'], csynth: ['c0250','c0600','c0875','c1250','c2000','c2875'] },
                kona:  { parts: ['0005','0026','0076','0074','0047','0063','0100','0105','0115','0141','0143','0144'], bolts: ['0071','0100','0115','0121','0139','0141','0143','0145','0138'], synth: ['s2072','s2180','s2207','s2046','s1910','s1775'], csynth: ['c13234','c25279','c30872','c32816','c36188','c49018'] } };
-    var NOTE = { parts: 'Large-part models on real frames, in teardown order. Bolts belong to the fastener model. Wires and connectors are excluded from the CAD-vs-photo comparison; wires and cooling pipes are additionally scored with topology-aware metrics (clDice).',
+    var NOTE = { parts: 'Large-part models on real frames, in teardown order. Bolts belong to the fastener model. Wires and connectors are excluded from the CAD-vs-photo comparison. Because instance AP under-reports thin structures, wires and cooling pipes are scored with pixel Dice and clDice: for the CAD-trained Kona model, clDice is 0.724 for cooling pipes and 0.715 for wiring; e-tron wiring is only partially segmented (Dice 0.34).',
                  bolts: { etron: 'Fastener models, tiled inference on real frames. Full-resolution crop around the densest bolts; bolts only.',
                           kona: 'Fastener models, tiled inference on real frames. Full-resolution crop; bolts only. The Kona photo-to-sim fastener model is the post-submission run with corrected labels and is not part of the paper’s evaluation.' },
                  synth: 'Training renders of the photo-to-sim scene: randomized camera, lighting, background and teardown state. No real image is used for training.',
