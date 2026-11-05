@@ -204,6 +204,14 @@
   .robotable td.num, .robotable th.num { width: 22%; }
   .galbar { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px 56px; margin-bottom: 14px; }
   .galbar .galtabs { margin: 0; }
+  .galgroup { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  /* group labels in the section-kicker style; tabs without grey rules, the selected one underlined in the brand gradient */
+  .gallab { font-size: 15px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,.55); }
+  .galgroup { gap: 8px; }
+  .card .galtabs button { position: relative; border-bottom: 0; padding-bottom: 8px; color: rgba(255,255,255,.6); }
+  .card .galtabs button:hover { color: #fff; }
+  .card .galtabs button[aria-selected="true"] { color: #fff; }
+  .card .galtabs button[aria-selected="true"]::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--brand); }
   .gal { width: min(1520px, calc(100vw - 48px)); position: relative; left: 50%; transform: translateX(-50%); }
   .panels img { aspect-ratio: 1224 / 1024; }
   @media (max-width: 900px) { .gal { width: auto; left: 0; transform: none; } }
@@ -523,16 +531,18 @@
     <p class="lead">Hand-annotated Zivid frames of the two production packs. All models were trained on synthetic renders only. Large parts and fasteners are separate models: the fastener models run tiled over the full-resolution image. Selected examples; the full test sets are scored in the table below.</p></div>
   <div class="gal card">
     <div class="galbar">
-      <div class="galtabs" role="tablist" aria-label="Battery pack">
+      <div class="galgroup"><span class="gallab" id="lab-pack">Pack</span>
+      <div class="galtabs" role="tablist" aria-labelledby="lab-pack">
         <button role="tab" aria-selected="true" data-pack="etron">Audi e-tron</button>
         <button role="tab" aria-selected="false" data-pack="kona">Hyundai Kona</button>
-      </div>
-      <div class="galtabs" role="tablist" aria-label="Model">
+      </div></div>
+      <div class="galgroup"><span class="gallab" id="lab-show">Show</span>
+      <div class="galtabs" role="tablist" aria-labelledby="lab-show">
         <button role="tab" aria-selected="true" data-mode="parts">Large parts</button>
         <button role="tab" aria-selected="false" data-mode="bolts">Fasteners</button>
         <button role="tab" aria-selected="false" data-mode="csynth">Training data, CAD scene</button>
         <button role="tab" aria-selected="false" data-mode="synth">Training data, photo-to-sim scene</button>
-      </div>
+      </div></div>
     </div>
     <div class="panels" id="g-panels">
       <figure><img id="g-real" alt="Real image"><figcaption id="g-realcap">Real image</figcaption></figure>
